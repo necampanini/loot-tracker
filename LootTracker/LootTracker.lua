@@ -23,7 +23,7 @@
 local ADDON_NAME, LT = ...
 
 -- Addon version
-LT.VERSION = "1.0.0"
+LT.VERSION = "1.1.0"
 
 -- Create main frame for ADDON_LOADED event
 local mainFrame = CreateFrame("Frame")

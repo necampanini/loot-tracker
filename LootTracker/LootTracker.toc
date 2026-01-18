@@ -1,8 +1,8 @@
-## Interface: 110100
+## Interface: 120000
 ## Title: LootTracker
 ## Notes: Track raid loot rolls, attendance, and maintain history/statistics
 ## Author: Your Name
-## Version: 1.0.0
+## Version: 1.1.0
 ## SavedVariables: LootTrackerDB
 ## OptionalDeps: Ace3
 

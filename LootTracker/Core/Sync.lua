@@ -27,7 +27,7 @@ local syncState = {
     currentLeader = nil,
     pendingSync = {},
     lastSyncTime = 0,
-    version = "1.0.0",
+    version = "1.1.0",
 }
 
 -- Message queue for throttling
@@ -66,48 +66,125 @@ end
     MESSAGE SENDING
 ]]
 
--- Serialize data for transmission
+-- Serialize data for transmission (safe format, no code execution on deserialize)
+-- Format: ^T for table start, ^t for table end, ^S for string, ^N for number, ^B for bool, ^0 for nil
+-- Keys and values are separated by ^= and entries by ^,
 function LT.Sync:Serialize(data)
-    -- Simple serialization for Lua tables
-    -- In production, use AceSerializer for better handling
-    local serialized = ""
-
-    if type(data) == "table" then
-        serialized = "T{"
-        for k, v in pairs(data) do
-            local keyStr = type(k) == "number" and k or ('"' .. tostring(k) .. '"')
-            local valStr = self:Serialize(v)
-            serialized = serialized .. "[" .. keyStr .. "]=" .. valStr .. ","
-        end
-        serialized = serialized .. "}"
-    elseif type(data) == "string" then
-        serialized = '"' .. data:gsub('"', '\\"') .. '"'
-    elseif type(data) == "number" then
-        serialized = tostring(data)
+    if data == nil then
+        return "^0"
     elseif type(data) == "boolean" then
-        serialized = data and "true" or "false"
+        return data and "^Btrue" or "^Bfalse"
+    elseif type(data) == "number" then
+        return "^N" .. tostring(data)
+    elseif type(data) == "string" then
+        -- Escape special characters
+        local escaped = data:gsub("%^", "^^"):gsub("\n", "^n"):gsub("\r", "^r")
+        return "^S" .. escaped
+    elseif type(data) == "table" then
+        local parts = {}
+        for k, v in pairs(data) do
+            local keyStr = self:Serialize(k)
+            local valStr = self:Serialize(v)
+            table.insert(parts, keyStr .. "^=" .. valStr)
+        end
+        return "^T" .. table.concat(parts, "^,") .. "^t"
     else
-        serialized = "nil"
+        return "^0"
     end
-
-    return serialized
 end
 
--- Deserialize data from transmission
+-- Safe deserialize without loadstring (WoW 12.0 compatible)
 function LT.Sync:Deserialize(str)
-    -- Simple deserialization
-    -- WARNING: Using loadstring is generally unsafe, but addon messages
-    -- come from other players with the same addon, so risk is limited
     if not str or str == "" then return nil end
 
-    local func, err = loadstring("return " .. str)
-    if func then
-        local success, result = pcall(func)
-        if success then
+    local pos = 1
+    local len = #str
+
+    local function parseValue()
+        if pos > len then return nil end
+
+        local marker = str:sub(pos, pos + 1)
+
+        if marker == "^0" then
+            pos = pos + 2
+            return nil
+        elseif marker == "^B" then
+            pos = pos + 2
+            if str:sub(pos, pos + 3) == "true" then
+                pos = pos + 4
+                return true
+            else
+                pos = pos + 5
+                return false
+            end
+        elseif marker == "^N" then
+            pos = pos + 2
+            local numEnd = str:find("[%^]", pos) or (len + 1)
+            local numStr = str:sub(pos, numEnd - 1)
+            pos = numEnd
+            return tonumber(numStr)
+        elseif marker == "^S" then
+            pos = pos + 2
+            local result = ""
+            while pos <= len do
+                local char = str:sub(pos, pos)
+                if char == "^" then
+                    local nextChar = str:sub(pos + 1, pos + 1)
+                    if nextChar == "^" then
+                        result = result .. "^"
+                        pos = pos + 2
+                    elseif nextChar == "n" then
+                        result = result .. "\n"
+                        pos = pos + 2
+                    elseif nextChar == "r" then
+                        result = result .. "\r"
+                        pos = pos + 2
+                    else
+                        -- Hit a control sequence, string ends
+                        break
+                    end
+                else
+                    result = result .. char
+                    pos = pos + 1
+                end
+            end
             return result
+        elseif marker == "^T" then
+            pos = pos + 2
+            local tbl = {}
+            while pos <= len do
+                -- Check for table end
+                if str:sub(pos, pos + 1) == "^t" then
+                    pos = pos + 2
+                    break
+                end
+                -- Skip entry separator
+                if str:sub(pos, pos + 1) == "^," then
+                    pos = pos + 2
+                end
+                -- Check again for table end after separator
+                if str:sub(pos, pos + 1) == "^t" then
+                    pos = pos + 2
+                    break
+                end
+                -- Parse key
+                local key = parseValue()
+                if key == nil then break end
+                -- Skip key-value separator
+                if str:sub(pos, pos + 1) == "^=" then
+                    pos = pos + 2
+                end
+                -- Parse value
+                local value = parseValue()
+                tbl[key] = value
+            end
+            return tbl
         end
+
+        return nil
     end
-    return nil
+
+    return parseValue()
 end
 
 -- Queue a message for sending (handles throttling)
