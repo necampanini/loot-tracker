@@ -150,6 +150,35 @@ function LT.DB:RecordRoll(playerName, rollValue, minRoll, maxRoll)
     return true
 end
 
+-- Remove a roll from the active session (for joke rolls)
+function LT.DB:RemoveRoll(playerName, round, timestamp)
+    local session = self.db.activeSession
+    if not session then
+        return false, "No active roll session"
+    end
+
+    for i, roll in ipairs(session.rolls) do
+        -- Match by player, round, and timestamp for precision
+        if roll.player == playerName and roll.round == round and roll.timestamp == timestamp then
+            table.remove(session.rolls, i)
+
+            -- If in rerolling state, check if player was in eligible list
+            if session.state == "rerolling" then
+                for j, name in ipairs(session.eligiblePlayers) do
+                    if name == playerName then
+                        table.remove(session.eligiblePlayers, j)
+                        break
+                    end
+                end
+            end
+
+            return true
+        end
+    end
+
+    return false, "Roll not found"
+end
+
 -- Get highest rollers (handles ties)
 function LT.DB:GetHighestRollers(round)
     local session = self.db.activeSession

@@ -16,17 +16,29 @@ local currentTab = "history"
 function MainWindow:Create()
     if frame then return frame end
 
-    -- Main frame
+    -- Main frame (starts compact, is resizable)
     frame = CreateFrame("Frame", "LootTrackerMainFrame", UIParent, "BasicFrameTemplateWithInset")
-    frame:SetSize(600, 500)
+    frame:SetSize(450, 350)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
+    frame:SetResizable(true)
+    frame:SetResizeBounds(350, 280, 800, 700)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:SetClampedToScreen(true)
     frame:Hide()
+
+    -- Resize grip
+    frame.resizeGrip = CreateFrame("Button", nil, frame)
+    frame.resizeGrip:SetSize(16, 16)
+    frame.resizeGrip:SetPoint("BOTTOMRIGHT", -2, 2)
+    frame.resizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    frame.resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    frame.resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    frame.resizeGrip:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
+    frame.resizeGrip:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
 
     -- Make it closeable with Escape
     tinsert(UISpecialFrames, "LootTrackerMainFrame")

@@ -15,17 +15,29 @@ local frame = nil
 function RollTracker:Create()
     if frame then return frame end
 
-    -- Main frame
+    -- Main frame (starts small, is resizable)
     frame = CreateFrame("Frame", "LootTrackerRollFrame", UIParent, "BasicFrameTemplateWithInset")
-    frame:SetSize(300, 400)
+    frame:SetSize(250, 300)
     frame:SetPoint("CENTER")
     frame:SetMovable(true)
+    frame:SetResizable(true)
+    frame:SetResizeBounds(200, 200, 500, 600)
     frame:EnableMouse(true)
     frame:RegisterForDrag("LeftButton")
     frame:SetScript("OnDragStart", frame.StartMoving)
     frame:SetScript("OnDragStop", frame.StopMovingOrSizing)
     frame:SetClampedToScreen(true)
     frame:Hide()
+
+    -- Resize grip
+    frame.resizeGrip = CreateFrame("Button", nil, frame)
+    frame.resizeGrip:SetSize(16, 16)
+    frame.resizeGrip:SetPoint("BOTTOMRIGHT", -2, 2)
+    frame.resizeGrip:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    frame.resizeGrip:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    frame.resizeGrip:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+    frame.resizeGrip:SetScript("OnMouseDown", function() frame:StartSizing("BOTTOMRIGHT") end)
+    frame.resizeGrip:SetScript("OnMouseUp", function() frame:StopMovingOrSizing() end)
 
     -- Title
     frame.title = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
@@ -100,9 +112,9 @@ function RollTracker:Create()
     return frame
 end
 
--- Create a roll entry row
+-- Create a roll entry row (clickable to remove joke rolls)
 function RollTracker:CreateRollEntry(parent, index)
-    local entry = CreateFrame("Frame", nil, parent)
+    local entry = CreateFrame("Button", nil, parent)
     entry:SetHeight(20)
     entry:SetPoint("TOPLEFT", parent, "TOPLEFT", 0, -(index - 1) * 22)
     entry:SetPoint("TOPRIGHT", parent, "TOPRIGHT", 0, -(index - 1) * 22)
@@ -110,28 +122,57 @@ function RollTracker:CreateRollEntry(parent, index)
     -- Background (alternating colors)
     entry.bg = entry:CreateTexture(nil, "BACKGROUND")
     entry.bg:SetAllPoints()
-    if index % 2 == 0 then
-        entry.bg:SetColorTexture(0.1, 0.1, 0.1, 0.5)
-    else
-        entry.bg:SetColorTexture(0.15, 0.15, 0.15, 0.5)
-    end
+    entry.baseColor = (index % 2 == 0) and {0.1, 0.1, 0.1, 0.5} or {0.15, 0.15, 0.15, 0.5}
+    entry.bg:SetColorTexture(unpack(entry.baseColor))
+
+    -- Highlight on hover
+    entry:SetScript("OnEnter", function(self)
+        self.bg:SetColorTexture(0.3, 0.1, 0.1, 0.7)  -- Red tint on hover
+        GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        GameTooltip:SetText("Click to remove (joke roll)", 1, 0.5, 0.5)
+        GameTooltip:AddLine("Right-click for options", 0.7, 0.7, 0.7)
+        GameTooltip:Show()
+    end)
+    entry:SetScript("OnLeave", function(self)
+        self.bg:SetColorTexture(unpack(self.baseColor))
+        GameTooltip:Hide()
+    end)
+
+    -- Left-click to remove
+    entry:RegisterForClicks("LeftButtonUp", "RightButtonUp")
+    entry:SetScript("OnClick", function(self, button)
+        if button == "LeftButton" and self.rollData then
+            local success = LT.DB:RemoveRoll(self.rollData.player, self.rollData.round, self.rollData.timestamp)
+            if success then
+                print(string.format("|cffff9900LootTracker:|r Removed roll from %s (%d)",
+                    self.rollData.player, self.rollData.value))
+                RollTracker:UpdateRollList()
+            end
+        end
+    end)
 
     -- Player name
     entry.playerText = entry:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     entry.playerText:SetPoint("LEFT", 5, 0)
-    entry.playerText:SetWidth(120)
+    entry.playerText:SetWidth(100)
     entry.playerText:SetJustifyH("LEFT")
 
     -- Roll value
     entry.rollText = entry:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    entry.rollText:SetPoint("LEFT", entry.playerText, "RIGHT", 10, 0)
-    entry.rollText:SetWidth(40)
+    entry.rollText:SetPoint("LEFT", entry.playerText, "RIGHT", 5, 0)
+    entry.rollText:SetWidth(35)
     entry.rollText:SetJustifyH("CENTER")
 
     -- Round indicator
     entry.roundText = entry:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    entry.roundText:SetPoint("LEFT", entry.rollText, "RIGHT", 10, 0)
+    entry.roundText:SetPoint("LEFT", entry.rollText, "RIGHT", 5, 0)
     entry.roundText:SetTextColor(0.5, 0.5, 0.5)
+
+    -- Remove icon (X)
+    entry.removeIcon = entry:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    entry.removeIcon:SetPoint("RIGHT", -5, 0)
+    entry.removeIcon:SetText("×")
+    entry.removeIcon:SetTextColor(0.6, 0.3, 0.3)
 
     return entry
 end
@@ -170,6 +211,9 @@ function RollTracker:UpdateRollList()
             entry = self:CreateRollEntry(frame.scrollChild, i)
             frame.rollEntries[i] = entry
         end
+
+        -- Store roll data for removal
+        entry.rollData = roll
 
         entry.playerText:SetText(roll.player)
         entry.rollText:SetText(tostring(roll.value))

@@ -7,7 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.1.0] - 2026-01-18
 
+### Added
+- **Joke Roll Removal**: Click any roll entry to remove it (for troll/joke rolls)
+  - Hover shows red highlight and tooltip
+  - Confirms removal in chat
+- **Resizable Windows**: All windows can now be resized via drag grip in bottom-right corner
+  - Roll Tracker: 200x200 to 500x600
+  - Main Window: 350x280 to 800x700
+  - Export Window: 300x250 to 700x600
+
 ### Changed
+- **Compact Default Sizes**: Windows start smaller to reduce screen clutter
+  - Roll Tracker: 300x400 → 250x300
+  - Main Window: 600x500 → 450x350
+  - Export Window: 500x450 → 380x320
 - **WoW 12.0 (Midnight) Compatibility**: Updated Interface version to 120000
 - **Secure Serialization**: Replaced `loadstring()`-based deserialization with safe parser
   - Prevents potential code injection from malformed addon messages
