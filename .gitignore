@@ -1,0 +1,18 @@
+# WoW SavedVariables (user data, not code)
+*.bak
+SavedVariables/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Backup files
+*.backup
+*.orig

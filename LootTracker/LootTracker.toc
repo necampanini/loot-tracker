@@ -1,0 +1,27 @@
+## Interface: 110100
+## Title: LootTracker
+## Notes: Track raid loot rolls, attendance, and maintain history/statistics
+## Author: Your Name
+## Version: 1.0.0
+## SavedVariables: LootTrackerDB
+## OptionalDeps: Ace3
+
+# Core modules (load order matters)
+Core/Debug.lua
+Core/Database.lua
+Core/Events.lua
+Core/Sync.lua
+
+# UI modules
+UI/RollTracker.lua
+UI/MainWindow.lua
+UI/Export.lua
+
+# Testing modules (can be disabled in production)
+Tests/TestHarness.lua
+Tests/DatabaseTests.lua
+Tests/EventsTests.lua
+Tests/Simulation.lua
+
+# Main addon file (loads last, initializes everything)
+LootTracker.lua
